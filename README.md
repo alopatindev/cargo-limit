@@ -1,8 +1,10 @@
-<div align="center">
-  <img src="logo.svg" width="25%" height="25%" alt=""/>
-</div>
+# cargo-limit
+[![Crates.io](https://img.shields.io/crates/v/cargo-limit)](https://crates.io/crates/cargo-limit)
+[![Crates.io](https://img.shields.io/crates/d/cargo-limit)](https://crates.io/crates/cargo-limit)
+[![Awesome](https://gist.githubusercontent.com/alopatindev/56009d77564991c5474197f3aba85670/raw/cc4370f645d7ad40defcf8d1d14025dfa8726fd2/awesome.svg)](https://github.com/rust-unofficial/awesome-rust#build-system)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](#Support)
 
-# cargo-limit [![Crates.io](https://img.shields.io/crates/v/cargo-limit)](https://crates.io/crates/cargo-limit) [![Crates.io](https://img.shields.io/crates/d/cargo-limit)](https://crates.io/crates/cargo-limit) [![Awesome](https://gist.githubusercontent.com/alopatindev/56009d77564991c5474197f3aba85670/raw/cc4370f645d7ad40defcf8d1d14025dfa8726fd2/awesome.svg)](https://github.com/rust-unofficial/awesome-rust#build-system) [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](#Support)
+## Description
 
 🚀 Cargo with less noise:
 - errors have highest priority
@@ -18,7 +20,7 @@
 
 Initially this project was a workaround for **[this issue](https://github.com/rust-lang/rust/issues/27189), which was closed with no adequate solution**.
 
-Check out [roadmap](https://github.com/cargo-limit/cargo-limit/projects/1?fullscreen=true), [issues](https://github.com/cargo-limit/cargo-limit/issues) and [🎙️ Rustacean Station podcast episode](https://rustacean-station.org/episode/alexander-lopatin/) for more.
+Check out [🎙️  Rustacean Station podcast episode](https://rustacean-station.org/episode/alexander-lopatin/) for more.
 
 [![asciicast](https://gist.githubusercontent.com/alopatindev/2376b843dffef8d1a3af7ef44aef67be/raw/bfa15c2221cb5be128857068dd786374f9f6f186/cargo-limit-demo.svg)](https://asciinema.org/a/441673)
 
@@ -96,7 +98,7 @@ This tool is especially useful in combination with [cargo-watch](https://crates.
 
 Requires `nvim >= 0.7.0` and `git` to be installed.
 
-This plugin is [LSP](https://microsoft.github.io/language-server-protocol/)-independent, **it will keep working even when [rust-analyzer](https://rust-analyzer.github.io/) fails**!
+This plugin is [LSP](https://microsoft.github.io/language-server-protocol/)-independent, **it will keep working even when [rust-analyzer](https://rust-analyzer.github.io/) fails** to produce diagnostics!
 
 ### Using **[vim-plug](https://github.com/junegunn/vim-plug#neovim):**
 ```viml
@@ -157,23 +159,28 @@ nvim --cmd '!call dein#install()'
 
 ### Optionally: F2 to save, F2 again to jump to next affected line
 ```viml
-fun! SaveAllFilesOrOpenNextLocation()
-  let l:all_files_are_saved = v:true
+" TODO: naming
+fun! SaveAllFilesOrOpenNextLocation() abort
+  " TODO: os-dependant? let l:workspace_root = g:CargoLimitWorkspaceRoot() . '/'
+  let l:workspace_root = g:CargoLimitWorkspaceRoot()
+  let l:all_rust_files_are_saved = v:true
+
   for i in getbufinfo({'bufmodified': 1})
-    if i.name !=# ''
-      let l:all_files_are_saved = v:false
+    if i.name =~# l:workspace_root && !(i.name =~# '/BqfPreviewScrollBar$')
+      let l:all_rust_files_are_saved = v:false
       break
     endif
   endfor
 
-  if l:all_files_are_saved
-    if exists('*CargoLimitOpenNextLocation')
-      call g:CargoLimitOpenNextLocation()
-    endif
-  else
-    execute 'wa!'
+  if l:all_rust_files_are_saved && exists('*CargoLimitOpenNextLocation')
+    call g:CargoLimitOpenNextLocation()
   endif
+  execute 'wa!'
 endf
+
+nmap <F1> :call g:CargoLimitOpenPrevLocation()<Enter>
+vmap <F1> <Esc>:call g:CargoLimitOpenPrevLocation()<Enter>v
+imap <F1> <Esc>:call g:CargoLimitOpenPrevLocation()<Enter>i
 
 nmap <F2> :call SaveAllFilesOrOpenNextLocation()<cr>
 vmap <F2> <esc>:call SaveAllFilesOrOpenNextLocation()<cr>v
@@ -210,13 +217,9 @@ let g:CargoLimitVerbosity = 2 " warnings level
 
 This is by design, in order to **not disrupt** from active text editing or file navigation process.
 
-### 2. Auto-jump on each file save is currently imprecise
-- it may jump to a wrong line if it moved
-- it may not jump at all, if the next affected line is supposed to be modified already
+Also auto-jump may not happen to affected line that supposed to be **already modified/fixed** (until you rerun `cargo ll{check,run,etc.}`).
 
-For precise jump please rerun `cargo ll{check,run,etc.}`.
-
-### 3. Before running `nvim`: Current Directory should be Project (sub)directory
+### 2. Before running `nvim`: Current Directory should be Project (sub)directory
 - that's required so **cargo-limit** could [figure out](https://github.com/cargo-limit/cargo-limit/issues/30#issuecomment-1219793195) which exact `nvim` instance should be controlled
 - only **first `nvim` instance** with current project (sub)directory will be **controlled by cargo-limit**.
 
@@ -224,20 +227,20 @@ For precise jump please rerun `cargo ll{check,run,etc.}`.
 </details>
 
 ## Customizations
-Add a **custom open handler** to your `init.vim` if you want other Neovim behavior.
+Add **custom update handlers** to your `init.vim` if you want other Neovim behavior.
 
 <details>
-<summary><b>💡 See examples! 👁️</b></summary>
+<summary><b>💡 See examples for Neovim! 👁️</b></summary>
 <p>
 
 ### Open Files in Buffers Instead of Tabs
 ```viml
-function! g:CargoLimitOpen(editor_data)
+fun! g:CargoLimitUpdate(editor_data)
   let l:current_file = resolve(expand('%:p'))
   if l:current_file != '' && !filereadable(l:current_file)
     return
   endif
-  for location in reverse(a:editor_data.files)
+  for location in reverse(a:editor_data.locations)
     let l:path = fnameescape(location.path)
     if mode() == 'n' && &l:modified == 0
       execute 'edit ' . l:path
@@ -253,15 +256,29 @@ endf
 ```viml
 set errorformat =%f:%l:%c:%m
 
-function! g:CargoLimitOpen(editor_data)
+fun! g:CargoLimitUpdate(editor_data)
+  if a:editor_data['corrected_locations']
+    let l:quickfix_list_is_open = v:false
+    for win in getwininfo()
+      if win.quickfix
+        let l:quickfix_list_is_open = v:true
+        break
+      endif
+    endfor
+
+    if !l:quickfix_list_is_open
+      return
+    endif
+  endif
+
   let l:winnr = winnr()
 
   cgetexpr []
-  for file in a:editor_data['files']
-    caddexpr file['path'] . ':' . file['line'] . ':' . file['column'] . ':' . file['message']
+  for location in a:editor_data['locations']
+    caddexpr location['path'] . ':' . location['line'] . ':' . location['column'] . ':' . location['message']
   endfor
 
-  if empty(a:editor_data['files'])
+  if empty(a:editor_data['locations'])
     cclose
   else
     copen
@@ -288,7 +305,7 @@ endf
 {
   "protocol_version": "0.0.11",
   "workspace_root": "/full/path/to/project",
-  "files": [
+  "locations": [
     {
       "path": "/full/path/to/project/file.rs",
       "line": 4,
@@ -296,11 +313,12 @@ endf
       "message": "unused import: `diagnostic::DiagnosticSpan`",
       "level": "warning"
     }
-  ]
+  ],
+  "corrected_locations": false
 }
 ```
 
-Theoretically this can be used for any text editor or IDE, especially if it supports client/server communication. To do that you need a **wrapper app/script** that parses the `files` and gives them to the text editor or IDE client.
+Theoretically this can be used for any text editor or IDE, especially if it supports client/server communication. To do that you need a **wrapper app/script** that parses the `locations` and gives them to the text editor or IDE client.
 
 <details>
 <summary><b>💡 Example: Gedit! 👁️</b></summary>
@@ -311,7 +329,7 @@ Theoretically this can be used for any text editor or IDE, especially if it supp
 ```bash
 #!/bin/bash
 
-jq --raw-output '.files |= unique_by(.path) | .files[] | [
+jq --raw-output '.locations |= unique_by(.path) | .locations[] | [
     "gedit",
     .path,
     "+" + (.line | tostring) + ":" + (.column | tostring),

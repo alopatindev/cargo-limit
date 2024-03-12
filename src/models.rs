@@ -6,8 +6,6 @@ use std::path::{Path, PathBuf};
 pub struct EditorData {
     protocol_version: String,
     workspace_root: PathBuf,
-
-    #[serde(rename = "files")]
     locations: Vec<Location>,
 }
 
